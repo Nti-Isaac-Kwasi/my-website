@@ -1,0 +1,2414 @@
+<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Table &amp; Task Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        secondary: '#4b4aa8',
+                        dark: {
+                            bg: '#181818',
+                            card: '#242424',
+                            text: '#e0e0e0'
+                        },
+                        light: {
+                            bg: '#FFFFFF',
+                            card: '#F5F5F5',
+                            text: '#333333'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Calendar styles */
+        .calendar-day {
+            width: calc(100% / 7);
+            aspect-ratio: 1 / 1;
+            max-height: 60px;
+        }
+        
+        /* Animation for notifications */
+        @keyframes slideIn {
+            0% { transform: translateY(-100%); opacity: 0; }
+            10% { transform: translateY(0); opacity: 1; }
+            90% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-100%); opacity: 0; }
+        }
+        
+        .notification {
+            animation: slideIn 5s forwards;
+        }
+        
+        /* Shake animation for alarm */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        
+        .shake {
+            animation: shake 0.5s infinite;
+        }
+    </style>
+</head>
+<body class="bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text transition-colors duration-300">
+    <div id="app" class="max-w-6xl mx-auto px-4 py-6">
+        <!-- Header -->
+        <header class="mb-6 flex justify-between items-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-primary">
+                <i class="fas fa-calendar-check mr-2"></i>
+                Time Table &amp; Task Manager
+            </h1>
+            <div class="flex items-center gap-2">
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                    <i class="fas fa-moon dark:hidden"></i>
+                    <i class="fas fa-sun hidden dark:block"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Notifications container -->
+        <div id="notifications-container" class="fixed top-0 right-0 left-0 z-50 flex flex-col items-center pt-2 pointer-events-none"></div>
+
+        <!-- Alarm notification (hidden by default) -->
+        <div id="alarm-alert" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+            <div class="bg-white dark:bg-dark-card p-6 rounded-lg shadow-lg max-w-md w-full shake">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-primary" id="alarm-title">Alarm</h2>
+                    <span id="alarm-time" class="text-xl font-mono">00:00</span>
+                </div>
+                <p id="alarm-description" class="mb-4 text-gray-600 dark:text-gray-300">Time to wake up!</p>
+                <div class="flex justify-end gap-3">
+                    <button id="alarm-snooze" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                        Snooze (5m)
+                    </button>
+                    <button id="alarm-dismiss" class="px-4 py-2 bg-primary text-white rounded hover:bg-secondary transition">
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="mb-6">
+            <ul class="flex border-b border-gray-300 dark:border-gray-700 overflow-x-auto">
+                <li class="mr-1">
+                    <button class="tab-btn active py-2 px-4 rounded-t-lg text-base" data-target="tasks-section">
+                        <i class="fas fa-tasks mr-2"></i>Tasks
+                    </button>
+                </li>
+                <li class="mr-1">
+                    <button class="tab-btn py-2 px-4 rounded-t-lg text-base" data-target="schedule-section">
+                        <i class="fas fa-calendar-alt mr-2"></i>Schedule
+                    </button>
+                </li>
+                <li class="mr-1">
+                    <button class="tab-btn py-2 px-4 rounded-t-lg text-base" data-target="goals-section">
+                        <i class="fas fa-bullseye mr-2"></i>Goals
+                    </button>
+                </li>
+                <li>
+                    <button class="tab-btn py-2 px-4 rounded-t-lg text-base" data-target="alarms-section">
+                        <i class="fas fa-bell mr-2"></i>Alarms
+                    </button>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main content -->
+        <main>
+            <!-- Tasks Section -->
+            <section id="tasks-section" class="tab-content">
+                <div class="flex flex-col md:flex-row gap-6">
+                    <!-- Tasks List -->
+                    <div class="w-full md:w-2/3">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold">My Tasks</h2>
+                            <button id="add-task-btn" class="px-3 py-1 bg-primary text-white rounded-lg hover:bg-secondary transition">
+                                <i class="fas fa-plus mr-1"></i> Add Task
+                            </button>
+                        </div>
+                        
+                        <!-- Task filters -->
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            <button class="task-filter active px-3 py-1 rounded-full text-sm" data-filter="all">All</button>
+                            <button class="task-filter px-3 py-1 rounded-full text-sm" data-filter="today">Today</button>
+                            <button class="task-filter px-3 py-1 rounded-full text-sm" data-filter="upcoming">Upcoming</button>
+                            <button class="task-filter px-3 py-1 rounded-full text-sm" data-filter="completed">Completed</button>
+                        </div>
+                        
+                        <!-- Task list -->
+                        <div id="tasks-container" class="overflow-y-auto max-h-[60vh]">
+                            <!-- Tasks will be added here dynamically -->
+                            <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                No tasks yet. Click "Add Task" to create one.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Task Summary -->
+                    <div class="w-full md:w-1/3">
+                        <div class="bg-light-card dark:bg-dark-card p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-bold mb-3">Task Summary</h3>
+                            
+                            <!-- Task stats -->
+                            <div class="grid grid-cols-2 gap-3 mb-4">
+                                <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-md">
+                                    <p class="text-xs text-blue-600 dark:text-blue-300">Total</p>
+                                    <p id="total-tasks" class="text-xl font-bold">0</p>
+                                </div>
+                                <div class="p-3 bg-green-100 dark:bg-green-900 rounded-md">
+                                    <p class="text-xs text-green-600 dark:text-green-300">Completed</p>
+                                    <p id="completed-tasks" class="text-xl font-bold">0</p>
+                                </div>
+                                <div class="p-3 bg-orange-100 dark:bg-orange-900 rounded-md">
+                                    <p class="text-xs text-orange-600 dark:text-orange-300">Today</p>
+                                    <p id="today-tasks" class="text-xl font-bold">0</p>
+                                </div>
+                                <div class="p-3 bg-red-100 dark:bg-red-900 rounded-md">
+                                    <p class="text-xs text-red-600 dark:text-red-300">Overdue</p>
+                                    <p id="overdue-tasks" class="text-xl font-bold">0</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Today's focus -->
+                            <h3 class="text-lg font-bold mb-2">Today's Focus</h3>
+                            <div id="today-focus" class="space-y-2">
+                                <!-- Today's tasks will be added here -->
+                                <p class="text-gray-500 dark:text-gray-400 text-sm">No tasks scheduled for today.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Schedule Section -->
+            <section id="schedule-section" class="tab-content hidden">
+                <div class="flex flex-col gap-6">
+                    <!-- Calendar header -->
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold">My Schedule</h2>
+                        <div class="flex items-center gap-2">
+                            <button id="prev-month" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span id="current-month-year" class="text-lg font-medium">September 2023</span>
+                            <button id="next-month" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                            <button id="today-btn" class="ml-2 px-3 py-1 bg-primary text-white rounded-lg hover:bg-secondary transition">
+                                Today
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Calendar -->
+                    <div class="bg-light-card dark:bg-dark-card rounded-lg shadow overflow-hidden">
+                        <!-- Days of week -->
+                        <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
+                            <div class="calendar-day p-2 text-center font-medium">Sun</div>
+                            <div class="calendar-day p-2 text-center font-medium">Mon</div>
+                            <div class="calendar-day p-2 text-center font-medium">Tue</div>
+                            <div class="calendar-day p-2 text-center font-medium">Wed</div>
+                            <div class="calendar-day p-2 text-center font-medium">Thu</div>
+                            <div class="calendar-day p-2 text-center font-medium">Fri</div>
+                            <div class="calendar-day p-2 text-center font-medium">Sat</div>
+                        </div>
+                        
+                        <!-- Calendar grid -->
+                        <div id="calendar-grid" class="grid grid-cols-7">
+                            <!-- Calendar days will be added here dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Daily schedule -->
+                    <div class="bg-light-card dark:bg-dark-card p-4 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 id="selected-date" class="text-lg font-bold">Today's Schedule</h3>
+                            <button id="add-schedule-btn" class="px-3 py-1 bg-primary text-white rounded-lg hover:bg-secondary transition">
+                                <i class="fas fa-plus mr-1"></i> Add Event
+                            </button>
+                        </div>
+                        
+                        <div id="daily-schedule" class="space-y-2">
+                            <!-- Schedule events will be added here dynamically -->
+                            <p class="text-gray-500 dark:text-gray-400 text-center py-4">No events scheduled for this day.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Goals Section -->
+            <section id="goals-section" class="tab-content hidden">
+                <div class="flex flex-col md:flex-row gap-6">
+                    <!-- Goal categories -->
+                    <div class="w-full md:w-1/3">
+                        <div class="bg-light-card dark:bg-dark-card p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-bold mb-3">Goal Categories</h3>
+                            
+                            <div class="space-y-3">
+                                <button id="short-term-btn" class="goal-cat active w-full text-left px-4 py-2 rounded-lg transition">
+                                    <i class="fas fa-bolt mr-2"></i> Short-term Goals
+                                </button>
+                                <button id="long-term-btn" class="goal-cat w-full text-left px-4 py-2 rounded-lg transition">
+                                    <i class="fas fa-mountain mr-2"></i> Long-term Goals
+                                </button>
+                                <button id="life-goal-btn" class="goal-cat w-full text-left px-4 py-2 rounded-lg transition">
+                                    <i class="fas fa-star mr-2"></i> Life Goals
+                                </button>
+                                <button id="habit-btn" class="goal-cat w-full text-left px-4 py-2 rounded-lg transition">
+                                    <i class="fas fa-sync-alt mr-2"></i> Habits
+                                </button>
+                            </div>
+                            
+                            <div class="mt-6">
+                                <button id="add-goal-btn" class="w-full px-3 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition">
+                                    <i class="fas fa-plus mr-1"></i> Add New Goal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Goal list -->
+                    <div class="w-full md:w-2/3">
+                        <div class="bg-light-card dark:bg-dark-card p-4 rounded-lg shadow">
+                            <h3 id="current-goal-category" class="text-lg font-bold mb-4">Short-term Goals</h3>
+                            
+                            <div id="goals-container" class="space-y-3 max-h-[60vh] overflow-y-auto">
+                                <!-- Goals will be added here dynamically -->
+                                <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                    No goals added yet. Click "Add New Goal" to get started.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Alarms Section -->
+            <section id="alarms-section" class="tab-content hidden">
+                <div class="flex flex-col gap-6">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold">My Alarms</h2>
+                        <button id="add-alarm-btn" class="px-3 py-1 bg-primary text-white rounded-lg hover:bg-secondary transition">
+                            <i class="fas fa-plus mr-1"></i> Add Alarm
+                        </button>
+                    </div>
+                    
+                    <!-- Current time -->
+                    <div class="bg-light-card dark:bg-dark-card p-6 rounded-lg shadow text-center">
+                        <div id="current-time" class="font-mono text-4xl mb-2">00:00:00</div>
+                        <div id="current-date" class="text-gray-600 dark:text-gray-400"></div>
+                    </div>
+                    
+                    <!-- Alarms list -->
+                    <div class="bg-light-card dark:bg-dark-card p-4 rounded-lg shadow">
+                        <h3 class="text-lg font-bold mb-4">All Alarms</h3>
+                        
+                        <div id="alarms-container" class="space-y-3">
+                            <!-- Alarms will be added here dynamically -->
+                            <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                No alarms set. Click "Add Alarm" to create one.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal for adding/editing tasks -->
+        <div id="task-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-40 hidden">
+            <div class="bg-white dark:bg-dark-card p-6 rounded-lg shadow-lg max-w-md w-full">
+                <h3 id="task-modal-title" class="text-xl font-bold mb-4">Add New Task</h3>
+                
+                <form id="task-form" class="space-y-4">
+                    <input type="hidden" id="task-id">
+                    
+                    <div>
+                        <label for="task-name" class="block text-sm font-medium mb-1">Task Name</label>
+                        <input type="text" id="task-name" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base" required="">
+                    </div>
+                    
+                    <div>
+                        <label for="task-description" class="block text-sm font-medium mb-1">Description (optional)</label>
+                        <textarea id="task-description" rows="3" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base"></textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="task-date" class="block text-sm font-medium mb-1">Due Date</label>
+                            <input type="date" id="task-date" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base" required="">
+                        </div>
+                        
+                        <div>
+                            <label for="task-time" class="block text-sm font-medium mb-1">Due Time</label>
+                            <input type="time" id="task-time" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="task-priority" class="block text-sm font-medium mb-1">Priority</label>
+                        <select id="task-priority" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                            <option value="low">Low</option>
+                            <option value="medium" selected="">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" id="task-reminder" class="mr-2">
+                        <label for="task-reminder" class="text-sm">Set reminder</label>
+                    </div>
+                    
+                    <div id="reminder-options" class="pl-6 mt-2 hidden">
+                        <select id="reminder-time" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                            <option value="5">5 minutes before</option>
+                            <option value="15">15 minutes before</option>
+                            <option value="30">30 minutes before</option>
+                            <option value="60">1 hour before</option>
+                            <option value="1440">1 day before</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" id="cancel-task-btn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-primary text-white rounded hover:bg-secondary transition">
+                            Save Task
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for adding/editing goals -->
+        <div id="goal-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-40 hidden">
+            <div class="bg-white dark:bg-dark-card p-6 rounded-lg shadow-lg max-w-md w-full">
+                <h3 id="goal-modal-title" class="text-xl font-bold mb-4">Add New Goal</h3>
+                
+                <form id="goal-form" class="space-y-4">
+                    <input type="hidden" id="goal-id">
+                    
+                    <div>
+                        <label for="goal-title" class="block text-sm font-medium mb-1">Goal Title</label>
+                        <input type="text" id="goal-title" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base" required="">
+                    </div>
+                    
+                    <div>
+                        <label for="goal-description" class="block text-sm font-medium mb-1">Description</label>
+                        <textarea id="goal-description" rows="3" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label for="goal-category" class="block text-sm font-medium mb-1">Category</label>
+                        <select id="goal-category" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                            <option value="short-term">Short-term Goal</option>
+                            <option value="long-term">Long-term Goal</option>
+                            <option value="life">Life Goal</option>
+                            <option value="habit">Habit</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="goal-target-date" class="block text-sm font-medium mb-1">Target Date (optional)</label>
+                        <input type="date" id="goal-target-date" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" id="cancel-goal-btn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-primary text-white rounded hover:bg-secondary transition">
+                            Save Goal
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for adding/editing alarms -->
+        <div id="alarm-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-40 hidden">
+            <div class="bg-white dark:bg-dark-card p-6 rounded-lg shadow-lg max-w-md w-full">
+                <h3 id="alarm-modal-title" class="text-xl font-bold mb-4">Add New Alarm</h3>
+                
+                <form id="alarm-form" class="space-y-4">
+                    <input type="hidden" id="alarm-id">
+                    
+                    <div>
+                        <label for="alarm-name" class="block text-sm font-medium mb-1">Alarm Name</label>
+                        <input type="text" id="alarm-name" placeholder="Morning Alarm" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                    </div>
+                    
+                    <div>
+                        <label for="alarm-time-input" class="block text-sm font-medium mb-1">Time</label>
+                        <input type="time" id="alarm-time-input" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base" required="">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Repeat</label>
+                        <div class="grid grid-cols-7 gap-1">
+                            <button type="button" data-day="sun" class="repeat-day p-2 rounded-full text-center">S</button>
+                            <button type="button" data-day="mon" class="repeat-day p-2 rounded-full text-center">M</button>
+                            <button type="button" data-day="tue" class="repeat-day p-2 rounded-full text-center">T</button>
+                            <button type="button" data-day="wed" class="repeat-day p-2 rounded-full text-center">W</button>
+                            <button type="button" data-day="thu" class="repeat-day p-2 rounded-full text-center">T</button>
+                            <button type="button" data-day="fri" class="repeat-day p-2 rounded-full text-center">F</button>
+                            <button type="button" data-day="sat" class="repeat-day p-2 rounded-full text-center">S</button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="alarm-sound" class="block text-sm font-medium mb-1">Sound</label>
+                        <select id="alarm-sound" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                            <option value="default">Default</option>
+                            <option value="digital">Digital</option>
+                            <option value="gentle">Gentle</option>
+                            <option value="nature">Nature</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" id="alarm-vibrate" class="mr-2" checked="">
+                        <label for="alarm-vibrate" class="text-sm">Vibrate</label>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" id="cancel-alarm-btn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-primary text-white rounded hover:bg-secondary transition">
+                            Save Alarm
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for adding/editing schedule events -->
+        <div id="schedule-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-40 hidden">
+            <div class="bg-white dark:bg-dark-card p-6 rounded-lg shadow-lg max-w-md w-full">
+                <h3 id="schedule-modal-title" class="text-xl font-bold mb-4">Add Event</h3>
+                
+                <form id="schedule-form" class="space-y-4">
+                    <input type="hidden" id="event-id">
+                    
+                    <div>
+                        <label for="event-title" class="block text-sm font-medium mb-1">Event Title</label>
+                        <input type="text" id="event-title" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base" required="">
+                    </div>
+                    
+                    <div>
+                        <label for="event-date" class="block text-sm font-medium mb-1">Date</label>
+                        <input type="date" id="event-date" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base" required="">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="event-start-time" class="block text-sm font-medium mb-1">Start Time</label>
+                            <input type="time" id="event-start-time" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base" required="">
+                        </div>
+                        
+                        <div>
+                            <label for="event-end-time" class="block text-sm font-medium mb-1">End Time</label>
+                            <input type="time" id="event-end-time" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base" required="">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="event-description" class="block text-sm font-medium mb-1">Description (optional)</label>
+                        <textarea id="event-description" rows="2" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label for="event-color" class="block text-sm font-medium mb-1">Color</label>
+                        <select id="event-color" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                            <option value="blue">Blue</option>
+                            <option value="green">Green</option>
+                            <option value="red">Red</option>
+                            <option value="purple">Purple</option>
+                            <option value="orange">Orange</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" id="event-reminder" class="mr-2">
+                        <label for="event-reminder" class="text-sm">Set reminder</label>
+                    </div>
+                    
+                    <div id="event-reminder-options" class="pl-6 mt-2 hidden">
+                        <select id="event-reminder-time" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-bg text-base">
+                            <option value="5">5 minutes before</option>
+                            <option value="15">15 minutes before</option>
+                            <option value="30">30 minutes before</option>
+                            <option value="60">1 hour before</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" id="cancel-event-btn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-primary text-white rounded hover:bg-secondary transition">
+                            Save Event
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Audio elements for alarms -->
+        <audio id="alarm-sound-default" src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADwAD///////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAXwAAAAAAAAA8BUy8eZAAAAAAAAAAAAAAAAAAAAAP/7UMQAAApkVVFGKgAorVbYIoAAAAH4hnIA4oAI5MdR/6H/qcEEVOeuyEIQhG7lUHff+g5726ry1f//ut2Ov//5ZtnX/+t//7vmtZ1/////5ZZ11f////+SysAAAAAMExBTUUzLjEwMAKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//tQxAAADZRTTlj9AAG4EmmLH6AIKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq" preload="auto"></audio>
+        <audio id="alarm-sound-digital" src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAHAAASrgAHBwkJDAwODhISFBQXFxkZHBweHiIiJSUpKS0tMjI4OD4+QkJGRkpKT09UVFRUTFRZWV5eY2NoaGxsbHR0eXl+foODiYmOjpOTmJieXl91dWlpXV1SUkZGOjowMCgoISEbGxUVEBALCwcHBAQAAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAYiAAAAAAAAEq6T1jjLAAAAAAAAAAAAAAAAAAAAAP/7UMQAAAvYWWZWJAARShAszzDFQADiwD9AwAAgGBoGB/6BhoGAgCDEgDhBl5J7TF//kH+wf/Afjv9///y+X//+IEA+YcZ5X/5fL5X///8vhgwYYMwYDMGAwB//CYMwYMGDBg//8GDPLyv/Sf//7UMQVAAukAVNYZgLhcICsLMYJci8w5JhOSf/EyDDKkxJjcRIyYDAQAHFR0GOyxhJUHOFqDLuB0VGD7AgJxcQORm5iMZ1IzRymVl1kV3TdUXlJlazM6Mq1NRmlzNmT2s7NVNZWU02tS1r//tQxCKACzAFY2ZgAKGAgCxshIEUXdEolRKFkkSRUKJo1KmiUKFEoUKaBJEoWlEkKlTRqFptE0aNJDQokmgS2gaOgSNImmhoaNaWXfS3Vdu9vS9i3vcs3u9O79zr2uu6l3vTUu33UlBBTUUzLjk5LjVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7UMQ5AAwkF0vtBLCBgYArPCCgBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==" preload="auto"></audio>
+        <audio id="alarm-sound-gentle" src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA////////////////////////////////////////////////////////////////////////////////////////////////TGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQoAAAAAAAAcQGO0TFoAAAAAAAAAAAAAAAAAAAAAP/7UMQAAApYVUdWMAAh7AKoqxgAAGBASAAABD5UITRlxCGCYEEMDGNW+3//3WXzf/o///9FdJ3/6C6TftX/pOlwB0nUAOn99IY6GBChGmFBnf/LQQxDFP/+YD7f+VEOc5/yopWhFf/7UMQKgA1Qc0/mMGohrBBo/MYZcK/+bUH/90Z9/8JmfVf/9mVGLEzP//mpRjP/+1Kf/9t2///Z///9P///hT////p////W////+n///7/3lT///1aP//8s///w1P//9FoYhgAAACAQCAQnQAAgENEVjjDZYzrGQZ3tnZ2dnZ2dRKJRWO1OkEgkEgkEZV3d3d3d3dzrJRKKx2p0gkEgkEgjKu7u7u7u7/+tz//tQxAKAC3CXVeYwy8l1E6o8xJn5u7u7u7u7nWSiUVjtTpBIJBIJBGVd3d3d3d3c6yUSisdqdIJBIJBIIyru7u7u7u7nWSiUVjtTpBIJBIJBGVOXbFMQU1FMy45OS41qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq" preload="auto"></audio>
+        <audio id="alarm-sound-nature" src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA////////////////////////////////////////////////////////////////////////////////////////////////TGF2YzU4LjEzAAAAAAAAAAAAAAAAJAUJAAAAAAAAcQFMCq1hAAAAAAAAAAAAAAAAAAAAAP/7UMQAAApQWVlBiDLCKQqn/MSZeJ4KdXCTUfhId9YQHBwcBz0k1HoPA8Hg4P/QeB54g9D//////oJT++JOn+pPr0nrD+6Tv/6T+vS+sG/////Zk4tDhw6GiJDoww0Ogf/iHQ0Xf/7UMQGAAqslVFGJGuBQxKpfMeVcP//+vX///Xp6PJGP//EfBseL////9D////U////jH////o///////R//////lv//+vT////t///9f////+jGMYxrWtCEIAAAAAAHKn3FCHFpaUvqrXWVOWlPrWtZVKpVKnLSlJa1rKpVKpU5aUtLWsqlUqlTlpSWta1lUqlUqctKfWtZVKpVKnLSl9Va6ypVSpyz//tQxAOAC2yXSWYxC5Fvkyhozik68ta1rKpVKpU5aU+ta1lUqlUqctKXVWuupUqpVKnLS0ta1lUqlUqctKfWtZVKpVKnLSl9Va6ypVSpyzy1rWVSqVSpy0p9a1lUqlUqctKS1rWVSqVSpy0p9a1lUqlUqctKXVWuupUqpVvMQU1FMy45OS41VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV" preload="auto"></audio>
+    
+        <!-- JavaScript -->
+        <script>
+            // Main App Data
+            const appData = {
+                tasks: [],
+                scheduleEvents: [],
+                goals: [],
+                alarms: [],
+                currentPage: 'tasks-section',
+                currentGoalCategory: 'short-term',
+                selectedDate: new Date(),
+                lastTaskId: 0,
+                lastEventId: 0,
+                lastGoalId: 0,
+                lastAlarmId: 0,
+            };
+
+            // Check for dark mode preference
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+            }
+            
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+                if (event.matches) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            });
+
+            // Theme toggle
+            document.getElementById('theme-toggle').addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+            });
+
+            // Tab navigation
+            document.querySelectorAll('.tab-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.getAttribute('data-target');
+                    
+                    // Remove active class from all tabs and hide all content
+                    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active', 'bg-primary', 'text-white'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+                    
+                    // Add active class to clicked tab and show corresponding content
+                    button.classList.add('active', 'bg-primary', 'text-white');
+                    document.getElementById(targetId).classList.remove('hidden');
+                    
+                    // Update current page
+                    appData.currentPage = targetId;
+                });
+            });
+            
+            // Set initial tab styling
+            document.querySelector('.tab-btn.active').classList.add('bg-primary', 'text-white');
+
+            // Task filters
+            document.querySelectorAll('.task-filter').forEach(filter => {
+                filter.addEventListener('click', () => {
+                    document.querySelectorAll('.task-filter').forEach(f => f.classList.remove('active', 'bg-primary', 'text-white'));
+                    filter.classList.add('active', 'bg-primary', 'text-white');
+                    
+                    filterTasks(filter.getAttribute('data-filter'));
+                });
+            });
+            
+            // Initial task filter styling
+            document.querySelector('.task-filter.active').classList.add('bg-primary', 'text-white');
+
+            // Goal category buttons
+            document.querySelectorAll('.goal-cat').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.goal-cat').forEach(b => b.classList.remove('active', 'bg-primary', 'text-white'));
+                    btn.classList.add('active', 'bg-primary', 'text-white');
+                    
+                    // Get category from button id
+                    const category = btn.id.replace('-btn', '');
+                    appData.currentGoalCategory = category;
+                    
+                    // Update display
+                    const categoryTitle = {
+                        'short-term': 'Short-term Goals',
+                        'long-term': 'Long-term Goals',
+                        'life-goal': 'Life Goals',
+                        'habit': 'Habits'
+                    };
+                    
+                    document.getElementById('current-goal-category').textContent = categoryTitle[category];
+                    filterGoals(category);
+                });
+            });
+            
+            // Initial goal category styling
+            document.querySelector('.goal-cat.active').classList.add('bg-primary', 'text-white');
+
+            // Modal open/close handlers
+            // Task modal
+            document.getElementById('add-task-btn').addEventListener('click', () => openTaskModal());
+            document.getElementById('cancel-task-btn').addEventListener('click', () => closeTaskModal());
+            
+            // Goal modal
+            document.getElementById('add-goal-btn').addEventListener('click', () => openGoalModal());
+            document.getElementById('cancel-goal-btn').addEventListener('click', () => closeGoalModal());
+            
+            // Alarm modal
+            document.getElementById('add-alarm-btn').addEventListener('click', () => openAlarmModal());
+            document.getElementById('cancel-alarm-btn').addEventListener('click', () => closeAlarmModal());
+            
+            // Schedule modal
+            document.getElementById('add-schedule-btn').addEventListener('click', () => openScheduleModal());
+            document.getElementById('cancel-event-btn').addEventListener('click', () => closeScheduleModal());
+
+            // Form submissions
+            // Task form
+            document.getElementById('task-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                saveTask();
+            });
+            
+            // Goal form
+            document.getElementById('goal-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                saveGoal();
+            });
+            
+            // Alarm form
+            document.getElementById('alarm-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                saveAlarm();
+            });
+            
+            // Schedule form
+            document.getElementById('schedule-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                saveScheduleEvent();
+            });
+
+            // Toggle reminder options for tasks
+            document.getElementById('task-reminder').addEventListener('change', function() {
+                const reminderOptions = document.getElementById('reminder-options');
+                if (this.checked) {
+                    reminderOptions.classList.remove('hidden');
+                } else {
+                    reminderOptions.classList.add('hidden');
+                }
+            });
+            
+            // Toggle reminder options for events
+            document.getElementById('event-reminder').addEventListener('change', function() {
+                const reminderOptions = document.getElementById('event-reminder-options');
+                if (this.checked) {
+                    reminderOptions.classList.remove('hidden');
+                } else {
+                    reminderOptions.classList.add('hidden');
+                }
+            });
+
+            // Alarm repeat days toggle
+            document.querySelectorAll('.repeat-day').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.classList.toggle('bg-primary');
+                    btn.classList.toggle('text-white');
+                });
+            });
+
+            // Calendar navigation
+            document.getElementById('prev-month').addEventListener('click', () => {
+                const currentMonth = appData.selectedDate.getMonth();
+                const currentYear = appData.selectedDate.getFullYear();
+                appData.selectedDate = new Date(currentYear, currentMonth - 1, 1);
+                renderCalendar();
+            });
+            
+            document.getElementById('next-month').addEventListener('click', () => {
+                const currentMonth = appData.selectedDate.getMonth();
+                const currentYear = appData.selectedDate.getFullYear();
+                appData.selectedDate = new Date(currentYear, currentMonth + 1, 1);
+                renderCalendar();
+            });
+            
+            document.getElementById('today-btn').addEventListener('click', () => {
+                appData.selectedDate = new Date();
+                renderCalendar();
+                updateSelectedDate();
+            });
+
+            // Alarm snooze and dismiss
+            document.getElementById('alarm-snooze').addEventListener('click', () => {
+                const alarmAlert = document.getElementById('alarm-alert');
+                alarmAlert.classList.add('hidden');
+                document.querySelectorAll('audio').forEach(audio => audio.pause());
+                
+                // Set a timeout to show the alarm again after 5 minutes
+                setTimeout(() => {
+                    alarmAlert.classList.remove('hidden');
+                    playAlarmSound('default');
+                }, 5 * 60 * 1000);
+            });
+            
+            document.getElementById('alarm-dismiss').addEventListener('click', () => {
+                document.getElementById('alarm-alert').classList.add('hidden');
+                document.querySelectorAll('audio').forEach(audio => audio.pause());
+            });
+
+            // Initialize application
+            function initializeApp() {
+                // Set up demo data
+                createDemoData();
+                
+                // Render initial views
+                renderTasks();
+                renderCalendar();
+                updateTaskSummary();
+                renderGoals();
+                renderAlarms();
+                
+                // Start clock
+                updateClock();
+                setInterval(updateClock, 1000);
+                
+                // Check for due tasks and alarms every minute
+                setInterval(checkReminders, 60000);
+            }
+
+            // Create demo data
+            function createDemoData() {
+                // Demo tasks
+                appData.tasks = [
+                    {
+                        id: 1,
+                        name: 'Complete project proposal',
+                        description: 'Finish the project proposal for the client meeting',
+                        date: new Date(new Date().setDate(new Date().getDate() + 2)),
+                        priority: 'high',
+                        completed: false,
+                        reminder: true,
+                        reminderTime: 60,
+                    },
+                    {
+                        id: 2,
+                        name: 'Buy groceries',
+                        description: 'Milk, eggs, bread, fruits',
+                        date: new Date(),
+                        priority: 'medium',
+                        completed: false,
+                        reminder: false,
+                    },
+                    {
+                        id: 3,
+                        name: 'Daily workout',
+                        description: '30 minutes cardio and strength training',
+                        date: new Date(),
+                        priority: 'medium',
+                        completed: true,
+                        reminder: false,
+                    }
+                ];
+                appData.lastTaskId = 3;
+                
+                // Demo schedule events
+                const today = new Date();
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                appData.scheduleEvents = [
+                    {
+                        id: 1,
+                        title: 'Team Meeting',
+                        date: today,
+                        startTime: '10:00',
+                        endTime: '11:30',
+                        description: 'Weekly team catch-up',
+                        color: 'blue',
+                        reminder: true,
+                        reminderTime: 15,
+                    },
+                    {
+                        id: 2,
+                        title: 'Lunch with Alex',
+                        date: today,
+                        startTime: '12:30',
+                        endTime: '13:30',
+                        description: 'At Café Central',
+                        color: 'green',
+                        reminder: false,
+                    },
+                    {
+                        id: 3,
+                        title: 'Client Presentation',
+                        date: tomorrow,
+                        startTime: '14:00',
+                        endTime: '15:30',
+                        description: 'Project proposal presentation',
+                        color: 'purple',
+                        reminder: true,
+                        reminderTime: 30,
+                    }
+                ];
+                appData.lastEventId = 3;
+                
+                // Demo goals
+                appData.goals = [
+                    {
+                        id: 1,
+                        title: 'Learn JavaScript',
+                        description: 'Complete online course on advanced JavaScript',
+                        category: 'short-term',
+                        targetDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+                        completed: false,
+                    },
+                    {
+                        id: 2,
+                        title: 'Read 20 books this year',
+                        description: '5 fiction, 5 non-fiction, 5 technical, 5 personal development',
+                        category: 'long-term',
+                        targetDate: new Date(new Date().setMonth(new Date().getMonth() + 12)),
+                        completed: false,
+                    },
+                    {
+                        id: 3,
+                        title: 'Morning meditation',
+                        description: '15 minutes meditation every morning',
+                        category: 'habit',
+                        targetDate: null,
+                        completed: false,
+                    }
+                ];
+                appData.lastGoalId = 3;
+                
+                // Demo alarms
+                const currentHour = new Date().getHours();
+                
+                appData.alarms = [
+                    {
+                        id: 1,
+                        name: 'Wake up',
+                        time: `${(currentHour + 1) % 24}:00`,
+                        repeatDays: ['mon', 'tue', 'wed', 'thu', 'fri'],
+                        sound: 'default',
+                        vibrate: true,
+                        enabled: true,
+                    },
+                    {
+                        id: 2,
+                        name: 'Medication reminder',
+                        time: `${(currentHour + 2) % 24}:30`,
+                        repeatDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+                        sound: 'gentle',
+                        vibrate: true,
+                        enabled: true,
+                    }
+                ];
+                appData.lastAlarmId = 2;
+            }
+
+            // Render tasks list
+            function renderTasks(filter = 'all') {
+                const tasksContainer = document.getElementById('tasks-container');
+                const filteredTasks = filterTasksByType(filter);
+                
+                if (filteredTasks.length === 0) {
+                    tasksContainer.innerHTML = `
+                        <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+                            No tasks found. Click "Add Task" to create one.
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Sort tasks: uncompleted first, then by date, then by priority
+                filteredTasks.sort((a, b) => {
+                    if (a.completed && !b.completed) return 1;
+                    if (!a.completed && b.completed) return -1;
+                    
+                    if (!a.completed && !b.completed) {
+                        const dateA = new Date(a.date);
+                        const dateB = new Date(b.date);
+                        
+                        if (dateA < dateB) return -1;
+                        if (dateA > dateB) return 1;
+                        
+                        const priorityOrder = { high: 1, medium: 2, low: 3 };
+                        return priorityOrder[a.priority] - priorityOrder[b.priority];
+                    }
+                    
+                    return 0;
+                });
+                
+                tasksContainer.innerHTML = filteredTasks.map(task => {
+                    const taskDate = new Date(task.date);
+                    const isOverdue = !task.completed && taskDate < new Date() && taskDate.setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+                    
+                    const priorityColors = {
+                        low: 'bg-blue-500',
+                        medium: 'bg-yellow-500',
+                        high: 'bg-red-500'
+                    };
+                    
+                    return `
+                        <div class="task-item mb-3 p-3 rounded-lg ${task.completed ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-dark-card'} shadow transition">
+                            <div class="flex items-center">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-1">
+                                        <input type="checkbox" ${task.completed ? 'checked' : ''} 
+                                            class="w-5 h-5 mr-3 cursor-pointer"
+                                            onchange="toggleTaskCompletion(${task.id})">
+                                        <h4 class="text-base font-medium ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : ''} ${isOverdue ? 'text-red-600 dark:text-red-400' : ''}">
+                                            ${task.name}
+                                        </h4>
+                                    </div>
+                                    
+                                    <div class="text-sm ml-8 ${task.completed ? 'text-gray-500 dark:text-gray-400' : 'text-gray-600 dark:text-gray-300'}">
+                                        ${task.description || ''}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center ml-4">
+                                    <span class="priority-indicator w-3 h-3 rounded-full ${priorityColors[task.priority]}"></span>
+                                    <span class="text-xs ml-2 mr-4 whitespace-nowrap ${isOverdue ? 'text-red-600 dark:text-red-400' : ''}">
+                                        ${formatDate(task.date)}
+                                    </span>
+                                    <div class="task-actions">
+                                        <button onclick="editTask(${task.id})" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mr-1">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button onclick="deleteTask(${task.id})" class="text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            ${task.reminder ? 
+                                `<div class="ml-8 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <i class="fas fa-bell mr-1"></i> Reminder: ${formatReminderTime(task.reminderTime)} before
+                                </div>` : ''
+                            }
+                        </div>
+                    `;
+                }).join('');
+                
+                // Update task summary after rendering
+                updateTaskSummary();
+                
+                // Update today's focus
+                renderTodayFocus();
+            }
+
+            // Filter tasks by type
+            function filterTasksByType(filter) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                switch(filter) {
+                    case 'today':
+                        return appData.tasks.filter(task => {
+                            const taskDate = new Date(task.date);
+                            taskDate.setHours(0, 0, 0, 0);
+                            return taskDate.getTime() === today.getTime();
+                        });
+                    case 'upcoming':
+                        return appData.tasks.filter(task => {
+                            const taskDate = new Date(task.date);
+                            taskDate.setHours(0, 0, 0, 0);
+                            return taskDate.getTime() > today.getTime();
+                        });
+                    case 'completed':
+                        return appData.tasks.filter(task => task.completed);
+                    default:
+                        return appData.tasks;
+                }
+            }
+
+            // Filter tasks and update display
+            function filterTasks(filter) {
+                renderTasks(filter);
+            }
+
+            // Update task summary
+            function updateTaskSummary() {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const totalTasks = appData.tasks.length;
+                const completedTasks = appData.tasks.filter(task => task.completed).length;
+                const todayTasks = appData.tasks.filter(task => {
+                    const taskDate = new Date(task.date);
+                    taskDate.setHours(0, 0, 0, 0);
+                    return taskDate.getTime() === today.getTime();
+                }).length;
+                const overdueTasks = appData.tasks.filter(task => {
+                    const taskDate = new Date(task.date);
+                    taskDate.setHours(0, 0, 0, 0);
+                    return !task.completed && taskDate.getTime() < today.getTime();
+                }).length;
+                
+                document.getElementById('total-tasks').textContent = totalTasks;
+                document.getElementById('completed-tasks').textContent = completedTasks;
+                document.getElementById('today-tasks').textContent = todayTasks;
+                document.getElementById('overdue-tasks').textContent = overdueTasks;
+            }
+
+            // Render today's focus
+            function renderTodayFocus() {
+                const todayFocusContainer = document.getElementById('today-focus');
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const todayTasks = appData.tasks.filter(task => {
+                    const taskDate = new Date(task.date);
+                    taskDate.setHours(0, 0, 0, 0);
+                    return taskDate.getTime() === today.getTime() && !task.completed;
+                });
+                
+                if (todayTasks.length === 0) {
+                    todayFocusContainer.innerHTML = `
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">No tasks scheduled for today.</p>
+                    `;
+                    return;
+                }
+                
+                // Sort by priority
+                todayTasks.sort((a, b) => {
+                    const priorityOrder = { high: 1, medium: 2, low: 3 };
+                    return priorityOrder[a.priority] - priorityOrder[b.priority];
+                });
+                
+                todayFocusContainer.innerHTML = todayTasks.slice(0, 3).map(task => {
+                    const priorityColors = {
+                        low: 'border-blue-500',
+                        medium: 'border-yellow-500',
+                        high: 'border-red-500'
+                    };
+                    
+                    return `
+                        <div class="p-2 border-l-4 ${priorityColors[task.priority]} bg-gray-50 dark:bg-gray-800 rounded">
+                            <div class="text-sm font-medium">${task.name}</div>
+                        </div>
+                    `;
+                }).join('');
+                
+                if (todayTasks.length > 3) {
+                    todayFocusContainer.innerHTML += `
+                        <div class="text-center text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            + ${todayTasks.length - 3} more tasks today
+                        </div>
+                    `;
+                }
+            }
+
+            // Open task modal for adding a new task
+            function openTaskModal(taskId = null) {
+                const modal = document.getElementById('task-modal');
+                const form = document.getElementById('task-form');
+                const titleElement = document.getElementById('task-modal-title');
+                
+                // Reset form
+                form.reset();
+                document.getElementById('reminder-options').classList.add('hidden');
+                
+                // Set today as the default date
+                const today = new Date();
+                const formattedDate = today.toISOString().split('T')[0];
+                document.getElementById('task-date').value = formattedDate;
+                
+                if (taskId === null) {
+                    // Adding a new task
+                    titleElement.textContent = 'Add New Task';
+                    document.getElementById('task-id').value = '';
+                } else {
+                    // Editing existing task
+                    titleElement.textContent = 'Edit Task';
+                    
+                    const task = appData.tasks.find(t => t.id === taskId);
+                    if (task) {
+                        document.getElementById('task-id').value = task.id;
+                        document.getElementById('task-name').value = task.name;
+                        document.getElementById('task-description').value = task.description || '';
+                        
+                        // Format date for the input
+                        const taskDate = new Date(task.date);
+                        document.getElementById('task-date').value = taskDate.toISOString().split('T')[0];
+                        
+                        // Set time if it exists
+                        if (task.time) {
+                            document.getElementById('task-time').value = task.time;
+                        }
+                        
+                        document.getElementById('task-priority').value = task.priority;
+                        
+                        // Set reminder options
+                        document.getElementById('task-reminder').checked = task.reminder || false;
+                        if (task.reminder) {
+                            document.getElementById('reminder-options').classList.remove('hidden');
+                            document.getElementById('reminder-time').value = task.reminderTime || '15';
+                        }
+                    }
+                }
+                
+                modal.classList.remove('hidden');
+            }
+
+            // Close task modal
+            function closeTaskModal() {
+                document.getElementById('task-modal').classList.add('hidden');
+            }
+
+            // Save task
+            function saveTask() {
+                const taskId = document.getElementById('task-id').value;
+                const name = document.getElementById('task-name').value;
+                const description = document.getElementById('task-description').value;
+                const dateValue = document.getElementById('task-date').value;
+                const timeValue = document.getElementById('task-time').value;
+                const priority = document.getElementById('task-priority').value;
+                const reminder = document.getElementById('task-reminder').checked;
+                
+                let reminderTime = null;
+                if (reminder) {
+                    reminderTime = parseInt(document.getElementById('reminder-time').value);
+                }
+                
+                // Create date object from inputs
+                const date = new Date(dateValue);
+                if (timeValue) {
+                    const [hours, minutes] = timeValue.split(':');
+                    date.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+                }
+                
+                if (taskId === '') {
+                    // Add new task
+                    appData.lastTaskId++;
+                    const newTask = {
+                        id: appData.lastTaskId,
+                        name,
+                        description,
+                        date,
+                        time: timeValue || null,
+                        priority,
+                        completed: false,
+                        reminder,
+                        reminderTime
+                    };
+                    
+                    appData.tasks.push(newTask);
+                    showNotification('Task added successfully');
+                } else {
+                    // Update existing task
+                    const taskIndex = appData.tasks.findIndex(t => t.id === parseInt(taskId));
+                    if (taskIndex !== -1) {
+                        const completed = appData.tasks[taskIndex].completed;
+                        
+                        appData.tasks[taskIndex] = {
+                            id: parseInt(taskId),
+                            name,
+                            description,
+                            date,
+                            time: timeValue || null,
+                            priority,
+                            completed,
+                            reminder,
+                            reminderTime
+                        };
+                        
+                        showNotification('Task updated successfully');
+                    }
+                }
+                
+                // Close modal, refresh tasks display
+                closeTaskModal();
+                renderTasks();
+                renderCalendar();
+                
+                // Check for reminders in case we edited a task that's due soon
+                checkReminders();
+            }
+
+            // Toggle task completion status
+            function toggleTaskCompletion(taskId) {
+                const taskIndex = appData.tasks.findIndex(t => t.id === taskId);
+                if (taskIndex !== -1) {
+                    appData.tasks[taskIndex].completed = !appData.tasks[taskIndex].completed;
+                    
+                    if (appData.tasks[taskIndex].completed) {
+                        showNotification('Task completed! 🎉');
+                    }
+                    
+                    renderTasks();
+                }
+            }
+
+            // Edit task
+            function editTask(taskId) {
+                openTaskModal(taskId);
+            }
+
+            // Delete task
+            function deleteTask(taskId) {
+                // Find task index
+                const taskIndex = appData.tasks.findIndex(t => t.id === taskId);
+                if (taskIndex !== -1) {
+                    // Remove task from array
+                    appData.tasks.splice(taskIndex, 1);
+                    
+                    // Update display
+                    renderTasks();
+                    renderCalendar();
+                    showNotification('Task deleted');
+                }
+            }
+
+            // Render calendar
+            function renderCalendar() {
+                const currentDate = appData.selectedDate;
+                const currentMonth = currentDate.getMonth();
+                const currentYear = currentDate.getFullYear();
+                
+                // Set the month and year in the header
+                const monthNames = ["January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December"];
+                document.getElementById('current-month-year').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+                
+                // Get the first day of the month and total days
+                const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+                const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+                
+                // Previous month days for padding
+                const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
+                
+                // Generate calendar grid
+                const calendarGrid = document.getElementById('calendar-grid');
+                calendarGrid.innerHTML = '';
+                
+                // Add previous month days
+                for (let i = firstDayOfMonth - 1; i >= 0; i--) {
+                    const day = prevMonthDays - i;
+                    const dayElement = createCalendarDay(day, 'prev-month');
+                    calendarGrid.appendChild(dayElement);
+                }
+                
+                // Add current month days
+                const today = new Date();
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const checkDate = new Date(currentYear, currentMonth, day);
+                    const isToday = today.getDate() === day && 
+                                    today.getMonth() === currentMonth && 
+                                    today.getFullYear() === currentYear;
+                    
+                    const dayElement = createCalendarDay(day, 'current-month', isToday, checkDate);
+                    calendarGrid.appendChild(dayElement);
+                }
+                
+                // Calculate days needed from next month to complete the grid
+                const totalDaysDisplayed = firstDayOfMonth + daysInMonth;
+                const nextMonthDays = Math.ceil(totalDaysDisplayed / 7) * 7 - totalDaysDisplayed;
+                
+                // Add next month days
+                for (let day = 1; day <= nextMonthDays; day++) {
+                    const dayElement = createCalendarDay(day, 'next-month');
+                    calendarGrid.appendChild(dayElement);
+                }
+                
+                // Update daily schedule for the selected date
+                updateSelectedDate();
+            }
+
+            // Create calendar day element
+            function createCalendarDay(day, monthClass, isToday = false, date = null) {
+                const dayElement = document.createElement('div');
+                dayElement.className = `calendar-day p-1 relative border border-gray-200 dark:border-gray-700 ${
+                    monthClass === 'current-month' ? 'bg-white dark:bg-dark-card' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600'
+                } ${isToday ? 'relative' : ''}`;
+                
+                // Day number
+                const dayNumber = document.createElement('div');
+                dayNumber.className = `text-center ${isToday ? 'bg-primary text-white rounded-full w-7 h-7 flex items-center justify-center mx-auto' : ''}`;
+                dayNumber.textContent = day;
+                dayElement.appendChild(dayNumber);
+                
+                // If this is a current month day, add event listener and check for events/tasks
+                if (monthClass === 'current-month') {
+                    dayElement.setAttribute('data-date', date.toISOString());
+                    
+                    // Click event to select this date
+                    dayElement.addEventListener('click', () => {
+                        appData.selectedDate = new Date(date);
+                        updateSelectedDate();
+                        
+                        // Update visual selection
+                        document.querySelectorAll('.calendar-day').forEach(day => {
+                            day.classList.remove('ring-2', 'ring-primary');
+                        });
+                        dayElement.classList.add('ring-2', 'ring-primary');
+                    });
+                    
+                    // Check for tasks on this day
+                    const tasksForDay = appData.tasks.filter(task => {
+                        const taskDate = new Date(task.date);
+                        return taskDate.getDate() === day &&
+                               taskDate.getMonth() === date.getMonth() &&
+                               taskDate.getFullYear() === date.getFullYear();
+                    });
+                    
+                    // Check for events on this day
+                    const eventsForDay = appData.scheduleEvents.filter(event => {
+                        const eventDate = new Date(event.date);
+                        return eventDate.getDate() === day &&
+                               eventDate.getMonth() === date.getMonth() &&
+                               eventDate.getFullYear() === date.getFullYear();
+                    });
+                    
+                    // Task indicator (max 3 dots)
+                    if (tasksForDay.length > 0 || eventsForDay.length > 0) {
+                        const indicatorContainer = document.createElement('div');
+                        indicatorContainer.className = 'flex justify-center gap-1 mt-1';
+                        
+                        const totalItems = Math.min(tasksForDay.length + eventsForDay.length, 3);
+                        
+                        for (let i = 0; i < totalItems; i++) {
+                            const dot = document.createElement('div');
+                            dot.className = 'w-1.5 h-1.5 rounded-full bg-primary';
+                            indicatorContainer.appendChild(dot);
+                        }
+                        
+                        dayElement.appendChild(indicatorContainer);
+                    }
+                    
+                    // Is this the currently selected date?
+                    if (date.getDate() === appData.selectedDate.getDate() && 
+                        date.getMonth() === appData.selectedDate.getMonth() && 
+                        date.getFullYear() === appData.selectedDate.getFullYear()) {
+                        dayElement.classList.add('ring-2', 'ring-primary');
+                    }
+                }
+                
+                return dayElement;
+            }
+
+            // Update selected date display and events
+            function updateSelectedDate() {
+                const date = appData.selectedDate;
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                document.getElementById('selected-date').textContent = date.toLocaleDateString(undefined, options);
+                
+                renderDailySchedule(date);
+            }
+
+            // Render daily schedule for selected date
+            function renderDailySchedule(date) {
+                const scheduleContainer = document.getElementById('daily-schedule');
+                
+                // Filter events for the selected date
+                const eventsForDay = appData.scheduleEvents.filter(event => {
+                    const eventDate = new Date(event.date);
+                    return eventDate.getDate() === date.getDate() &&
+                           eventDate.getMonth() === date.getMonth() &&
+                           eventDate.getFullYear() === date.getFullYear();
+                });
+                
+                // Sort events by start time
+                eventsForDay.sort((a, b) => {
+                    return a.startTime.localeCompare(b.startTime);
+                });
+                
+                // Get tasks for the selected date
+                const tasksForDay = appData.tasks.filter(task => {
+                    const taskDate = new Date(task.date);
+                    return taskDate.getDate() === date.getDate() &&
+                           taskDate.getMonth() === date.getMonth() &&
+                           taskDate.getFullYear() === date.getFullYear();
+                });
+                
+                // Sort tasks by time if available, or priority
+                tasksForDay.sort((a, b) => {
+                    if (a.time && b.time) return a.time.localeCompare(b.time);
+                    if (a.time) return -1;
+                    if (b.time) return 1;
+                    
+                    const priorityOrder = { high: 1, medium: 2, low: 3 };
+                    return priorityOrder[a.priority] - priorityOrder[b.priority];
+                });
+                
+                // Combine events and tasks into a timeline
+                if (eventsForDay.length === 0 && tasksForDay.length === 0) {
+                    scheduleContainer.innerHTML = `
+                        <p class="text-gray-500 dark:text-gray-400 text-center py-4">No events scheduled for this day.</p>
+                    `;
+                    return;
+                }
+                
+                let scheduleHtml = '';
+                
+                // Add events
+                if (eventsForDay.length > 0) {
+                    scheduleHtml += `<h4 class="font-medium text-sm mb-2">Events</h4>`;
+                    
+                    scheduleHtml += eventsForDay.map(event => {
+                        const eventColors = {
+                            blue: 'border-blue-500 bg-blue-50 dark:bg-blue-900/30',
+                            green: 'border-green-500 bg-green-50 dark:bg-green-900/30',
+                            red: 'border-red-500 bg-red-50 dark:bg-red-900/30',
+                            purple: 'border-purple-500 bg-purple-50 dark:bg-purple-900/30',
+                            orange: 'border-orange-500 bg-orange-50 dark:bg-orange-900/30'
+                        };
+                        
+                        return `
+                            <div class="schedule-event p-3 rounded-lg border-l-4 ${eventColors[event.color]} mb-2">
+                                <div class="flex justify-between items-center">
+                                    <h5 class="font-medium">${event.title}</h5>
+                                    <div class="text-sm">${formatTimeRange(event.startTime, event.endTime)}</div>
+                                </div>
+                                ${event.description ? `<p class="text-sm text-gray-600 dark:text-gray-300 mt-1">${event.description}</p>` : ''}
+                                <div class="flex justify-end gap-2 mt-2">
+                                    <button onclick="editScheduleEvent(${event.id})" class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                        <i class="fas fa-edit mr-1"></i>Edit
+                                    </button>
+                                    <button onclick="deleteScheduleEvent(${event.id})" class="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400">
+                                        <i class="fas fa-trash mr-1"></i>Delete
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                
+                // Add tasks
+                if (tasksForDay.length > 0) {
+                    scheduleHtml += `<h4 class="font-medium text-sm mt-4 mb-2">Tasks</h4>`;
+                    
+                    scheduleHtml += tasksForDay.map(task => {
+                        const priorityColors = {
+                            low: 'border-blue-500 bg-blue-50 dark:bg-blue-900/30',
+                            medium: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30',
+                            high: 'border-red-500 bg-red-50 dark:bg-red-900/30'
+                        };
+                        
+                        return `
+                            <div class="schedule-task p-3 rounded-lg border-l-4 ${priorityColors[task.priority]} mb-2 ${task.completed ? 'opacity-70' : ''}">
+                                <div class="flex items-center">
+                                    <input type="checkbox" ${task.completed ? 'checked' : ''} 
+                                        class="w-4 h-4 mr-3 cursor-pointer"
+                                        onchange="toggleTaskCompletion(${task.id})">
+                                    <div class="flex-1">
+                                        <h5 class="font-medium ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : ''}">${task.name}</h5>
+                                        ${task.time ? `<p class="text-xs text-gray-500 dark:text-gray-400">Due at ${formatTime(task.time)}</p>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                
+                scheduleContainer.innerHTML = scheduleHtml;
+            }
+
+            // Open schedule event modal
+            function openScheduleModal(eventId = null) {
+                const modal = document.getElementById('schedule-modal');
+                const form = document.getElementById('schedule-form');
+                const titleElement = document.getElementById('schedule-modal-title');
+                
+                // Reset form
+                form.reset();
+                document.getElementById('event-reminder-options').classList.add('hidden');
+                
+                // Set default date to selected date
+                const formattedDate = appData.selectedDate.toISOString().split('T')[0];
+                document.getElementById('event-date').value = formattedDate;
+                
+                if (eventId === null) {
+                    // Adding a new event
+                    titleElement.textContent = 'Add Event';
+                    document.getElementById('event-id').value = '';
+                    
+                    // Set default times
+                    const now = new Date();
+                    const hours = now.getHours();
+                    const roundedHours = hours + (now.getMinutes() >= 30 ? 1 : 0);
+                    
+                    const startTime = `${String(roundedHours % 24).padStart(2, '0')}:00`;
+                    const endTime = `${String((roundedHours + 1) % 24).padStart(2, '0')}:00`;
+                    
+                    document.getElementById('event-start-time').value = startTime;
+                    document.getElementById('event-end-time').value = endTime;
+                } else {
+                    // Editing existing event
+                    titleElement.textContent = 'Edit Event';
+                    
+                    const event = appData.scheduleEvents.find(e => e.id === eventId);
+                    if (event) {
+                        document.getElementById('event-id').value = event.id;
+                        document.getElementById('event-title').value = event.title;
+                        
+                        // Format date for the input
+                        const eventDate = new Date(event.date);
+                        document.getElementById('event-date').value = eventDate.toISOString().split('T')[0];
+                        
+                        document.getElementById('event-start-time').value = event.startTime;
+                        document.getElementById('event-end-time').value = event.endTime;
+                        document.getElementById('event-description').value = event.description || '';
+                        document.getElementById('event-color').value = event.color || 'blue';
+                        
+                        // Set reminder options
+                        document.getElementById('event-reminder').checked = event.reminder || false;
+                        if (event.reminder) {
+                            document.getElementById('event-reminder-options').classList.remove('hidden');
+                            document.getElementById('event-reminder-time').value = event.reminderTime || '15';
+                        }
+                    }
+                }
+                
+                modal.classList.remove('hidden');
+            }
+
+            // Close schedule event modal
+            function closeScheduleModal() {
+                document.getElementById('schedule-modal').classList.add('hidden');
+            }
+
+            // Save schedule event
+            function saveScheduleEvent() {
+                const eventId = document.getElementById('event-id').value;
+                const title = document.getElementById('event-title').value;
+                const dateValue = document.getElementById('event-date').value;
+                const startTime = document.getElementById('event-start-time').value;
+                const endTime = document.getElementById('event-end-time').value;
+                const description = document.getElementById('event-description').value;
+                const color = document.getElementById('event-color').value;
+                const reminder = document.getElementById('event-reminder').checked;
+                
+                let reminderTime = null;
+                if (reminder) {
+                    reminderTime = parseInt(document.getElementById('event-reminder-time').value);
+                }
+                
+                // Create date object
+                const date = new Date(dateValue);
+                
+                if (eventId === '') {
+                    // Add new event
+                    appData.lastEventId++;
+                    const newEvent = {
+                        id: appData.lastEventId,
+                        title,
+                        date,
+                        startTime,
+                        endTime,
+                        description,
+                        color,
+                        reminder,
+                        reminderTime
+                    };
+                    
+                    appData.scheduleEvents.push(newEvent);
+                    showNotification('Event added successfully');
+                } else {
+                    // Update existing event
+                    const eventIndex = appData.scheduleEvents.findIndex(e => e.id === parseInt(eventId));
+                    if (eventIndex !== -1) {
+                        appData.scheduleEvents[eventIndex] = {
+                            id: parseInt(eventId),
+                            title,
+                            date,
+                            startTime,
+                            endTime,
+                            description,
+                            color,
+                            reminder,
+                            reminderTime
+                        };
+                        
+                        showNotification('Event updated successfully');
+                    }
+                }
+                
+                // Close modal, refresh calendar
+                closeScheduleModal();
+                renderCalendar();
+                
+                // Check for reminders in case we edited an event that's happening soon
+                checkReminders();
+            }
+
+            // Edit schedule event
+            function editScheduleEvent(eventId) {
+                openScheduleModal(eventId);
+            }
+
+            // Delete schedule event
+            function deleteScheduleEvent(eventId) {
+                const eventIndex = appData.scheduleEvents.findIndex(e => e.id === eventId);
+                if (eventIndex !== -1) {
+                    appData.scheduleEvents.splice(eventIndex, 1);
+                    renderCalendar();
+                    showNotification('Event deleted');
+                }
+            }
+
+            // Filter goals by category
+            function filterGoals(category) {
+                // Map category button id to actual category value
+                const categoryMap = {
+                    'short-term': 'short-term',
+                    'long-term': 'long-term',
+                    'life-goal': 'life',
+                    'habit': 'habit'
+                };
+                
+                const selectedCategory = categoryMap[category];
+                
+                // Filter goals by the selected category
+                const filteredGoals = appData.goals.filter(goal => goal.category === selectedCategory);
+                
+                renderGoalsList(filteredGoals);
+            }
+
+            // Render goals list
+            function renderGoalsList(goals) {
+                const goalsContainer = document.getElementById('goals-container');
+                
+                if (goals.length === 0) {
+                    goalsContainer.innerHTML = `
+                        <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+                            No goals added yet. Click "Add New Goal" to get started.
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Sort goals: uncompleted first, then by target date if available
+                goals.sort((a, b) => {
+                    if (a.completed && !b.completed) return 1;
+                    if (!a.completed && b.completed) return -1;
+                    
+                    if (a.targetDate && b.targetDate) {
+                        return new Date(a.targetDate) - new Date(b.targetDate);
+                    }
+                    
+                    if (a.targetDate) return -1;
+                    if (b.targetDate) return 1;
+                    
+                    return 0;
+                });
+                
+                goalsContainer.innerHTML = goals.map(goal => {
+                    return `
+                        <div class="goal-item p-4 rounded-lg ${goal.completed ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-dark-card'} shadow transition">
+                            <div class="flex items-start">
+                                <input type="checkbox" ${goal.completed ? 'checked' : ''} 
+                                    class="w-5 h-5 mt-1 mr-3 cursor-pointer"
+                                    onchange="toggleGoalCompletion(${goal.id})">
+                                <div class="flex-1">
+                                    <h4 class="text-lg font-medium ${goal.completed ? 'line-through text-gray-500 dark:text-gray-400' : ''}">
+                                        ${goal.title}
+                                    </h4>
+                                    
+                                    <p class="text-sm mt-1 mb-3 ${goal.completed ? 'text-gray-500 dark:text-gray-400' : 'text-gray-600 dark:text-gray-300'}">
+                                        ${goal.description || 'No description provided'}
+                                    </p>
+                                    
+                                    ${goal.targetDate ? 
+                                        `<div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                                            <i class="fas fa-calendar-alt mr-1"></i> Target: ${formatDateLong(goal.targetDate)}
+                                        </div>` : ''
+                                    }
+                                </div>
+                                
+                                <div class="goal-actions ml-4">
+                                    <button onclick="editGoal(${goal.id})" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mr-2">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button onclick="deleteGoal(${goal.id})" class="text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Render all goals
+            function renderGoals() {
+                filterGoals(appData.currentGoalCategory);
+            }
+
+            // Open goal modal
+            function openGoalModal(goalId = null) {
+                const modal = document.getElementById('goal-modal');
+                const form = document.getElementById('goal-form');
+                const titleElement = document.getElementById('goal-modal-title');
+                
+                // Reset form
+                form.reset();
+                
+                // Set category based on current selection
+                const categoryMap = {
+                    'short-term': 'short-term',
+                    'long-term': 'long-term',
+                    'life-goal': 'life',
+                    'habit': 'habit'
+                };
+                
+                document.getElementById('goal-category').value = categoryMap[appData.currentGoalCategory];
+                
+                if (goalId === null) {
+                    // Adding a new goal
+                    titleElement.textContent = 'Add New Goal';
+                    document.getElementById('goal-id').value = '';
+                } else {
+                    // Editing existing goal
+                    titleElement.textContent = 'Edit Goal';
+                    
+                    const goal = appData.goals.find(g => g.id === goalId);
+                    if (goal) {
+                        document.getElementById('goal-id').value = goal.id;
+                        document.getElementById('goal-title').value = goal.title;
+                        document.getElementById('goal-description').value = goal.description || '';
+                        document.getElementById('goal-category').value = goal.category;
+                        
+                        // Format date for the input if it exists
+                        if (goal.targetDate) {
+                            const targetDate = new Date(goal.targetDate);
+                            document.getElementById('goal-target-date').value = targetDate.toISOString().split('T')[0];
+                        }
+                    }
+                }
+                
+                modal.classList.remove('hidden');
+            }
+
+            // Close goal modal
+            function closeGoalModal() {
+                document.getElementById('goal-modal').classList.add('hidden');
+            }
+
+            // Save goal
+            function saveGoal() {
+                const goalId = document.getElementById('goal-id').value;
+                const title = document.getElementById('goal-title').value;
+                const description = document.getElementById('goal-description').value;
+                const category = document.getElementById('goal-category').value;
+                const targetDateValue = document.getElementById('goal-target-date').value;
+                
+                // Create date object if target date is provided
+                let targetDate = null;
+                if (targetDateValue) {
+                    targetDate = new Date(targetDateValue);
+                }
+                
+                if (goalId === '') {
+                    // Add new goal
+                    appData.lastGoalId++;
+                    const newGoal = {
+                        id: appData.lastGoalId,
+                        title,
+                        description,
+                        category,
+                        targetDate,
+                        completed: false
+                    };
+                    
+                    appData.goals.push(newGoal);
+                    showNotification('Goal added successfully');
+                } else {
+                    // Update existing goal
+                    const goalIndex = appData.goals.findIndex(g => g.id === parseInt(goalId));
+                    if (goalIndex !== -1) {
+                        const completed = appData.goals[goalIndex].completed;
+                        
+                        appData.goals[goalIndex] = {
+                            id: parseInt(goalId),
+                            title,
+                            description,
+                            category,
+                            targetDate,
+                            completed
+                        };
+                        
+                        showNotification('Goal updated successfully');
+                    }
+                }
+                
+                // Close modal, refresh goals display
+                closeGoalModal();
+                renderGoals();
+            }
+
+            // Toggle goal completion status
+            function toggleGoalCompletion(goalId) {
+                const goalIndex = appData.goals.findIndex(g => g.id === goalId);
+                if (goalIndex !== -1) {
+                    appData.goals[goalIndex].completed = !appData.goals[goalIndex].completed;
+                    
+                    if (appData.goals[goalIndex].completed) {
+                        showNotification('Goal completed! 🎉');
+                    }
+                    
+                    renderGoals();
+                }
+            }
+
+            // Edit goal
+            function editGoal(goalId) {
+                openGoalModal(goalId);
+            }
+
+            // Delete goal
+            function deleteGoal(goalId) {
+                const goalIndex = appData.goals.findIndex(g => g.id === goalId);
+                if (goalIndex !== -1) {
+                    appData.goals.splice(goalIndex, 1);
+                    renderGoals();
+                    showNotification('Goal deleted');
+                }
+            }
+
+            // Render alarms
+            function renderAlarms() {
+                const alarmsContainer = document.getElementById('alarms-container');
+                
+                if (appData.alarms.length === 0) {
+                    alarmsContainer.innerHTML = `
+                        <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+                            No alarms set. Click "Add Alarm" to create one.
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Sort alarms by time
+                appData.alarms.sort((a, b) => a.time.localeCompare(b.time));
+                
+                alarmsContainer.innerHTML = appData.alarms.map(alarm => {
+                    // Format days
+                    const daysDisplay = formatAlarmDays(alarm.repeatDays);
+                    
+                    return `
+                        <div class="alarm-item p-3 rounded-lg bg-white dark:bg-dark-card shadow transition flex items-center">
+                            <div class="flex-1">
+                                <div class="flex items-center">
+                                    <div class="font-mono text-xl font-medium">${formatTime(alarm.time)}</div>
+                                    <label class="relative inline-flex items-center cursor-pointer ml-3">
+                                        <input type="checkbox" class="sr-only peer" ${alarm.enabled ? 'checked' : ''} 
+                                            onchange="toggleAlarm(${alarm.id}, this.checked)">
+                                        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                    </label>
+                                </div>
+                                
+                                <div class="text-sm mt-1">
+                                    <span class="font-medium">${alarm.name || 'Alarm'}</span>
+                                    ${daysDisplay ? `<span class="text-gray-500 dark:text-gray-400 ml-2">${daysDisplay}</span>` : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="alarm-actions">
+                                <button onclick="editAlarm(${alarm.id})" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mr-2">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="deleteAlarm(${alarm.id})" class="text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Format alarm days
+            function formatAlarmDays(days) {
+                if (!days || days.length === 0) {
+                    return '';
+                }
+                
+                const allDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+                
+                // Check for specific patterns
+                if (days.length === 7) {
+                    return 'Every day';
+                }
+                
+                if (days.length === 5 && 
+                    days.includes('mon') && 
+                    days.includes('tue') && 
+                    days.includes('wed') && 
+                    days.includes('thu') && 
+                    days.includes('fri')) {
+                    return 'Weekdays';
+                }
+                
+                if (days.length === 2 && 
+                    days.includes('sat') && 
+                    days.includes('sun')) {
+                    return 'Weekends';
+                }
+                
+                // Otherwise show abbreviated days
+                const dayAbbreviations = {
+                    mon: 'M',
+                    tue: 'T',
+                    wed: 'W',
+                    thu: 'T',
+                    fri: 'F',
+                    sat: 'S',
+                    sun: 'S'
+                };
+                
+                return days.map(day => dayAbbreviations[day]).join(' · ');
+            }
+
+            // Open alarm modal
+            function openAlarmModal(alarmId = null) {
+                const modal = document.getElementById('alarm-modal');
+                const form = document.getElementById('alarm-form');
+                const titleElement = document.getElementById('alarm-modal-title');
+                
+                // Reset form
+                form.reset();
+                
+                // Reset repeat days
+                document.querySelectorAll('.repeat-day').forEach(btn => {
+                    btn.classList.remove('bg-primary', 'text-white');
+                });
+                
+                if (alarmId === null) {
+                    // Adding a new alarm
+                    titleElement.textContent = 'Add New Alarm';
+                    document.getElementById('alarm-id').value = '';
+                    
+                    // Set default time to current time
+                    const now = new Date();
+                    const hours = String(now.getHours()).padStart(2, '0');
+                    const minutes = String(now.getMinutes()).padStart(2, '0');
+                    document.getElementById('alarm-time-input').value = `${hours}:${minutes}`;
+                } else {
+                    // Editing existing alarm
+                    titleElement.textContent = 'Edit Alarm';
+                    
+                    const alarm = appData.alarms.find(a => a.id === alarmId);
+                    if (alarm) {
+                        document.getElementById('alarm-id').value = alarm.id;
+                        document.getElementById('alarm-name').value = alarm.name || '';
+                        document.getElementById('alarm-time-input').value = alarm.time;
+                        document.getElementById('alarm-sound').value = alarm.sound || 'default';
+                        document.getElementById('alarm-vibrate').checked = alarm.vibrate !== false;
+                        
+                        // Set repeat days
+                        if (alarm.repeatDays && alarm.repeatDays.length > 0) {
+                            alarm.repeatDays.forEach(day => {
+                                const dayButton = document.querySelector(`.repeat-day[data-day="${day}"]`);
+                                if (dayButton) {
+                                    dayButton.classList.add('bg-primary', 'text-white');
+                                }
+                            });
+                        }
+                    }
+                }
+                
+                modal.classList.remove('hidden');
+            }
+
+            // Close alarm modal
+            function closeAlarmModal() {
+                document.getElementById('alarm-modal').classList.add('hidden');
+            }
+
+            // Save alarm
+            function saveAlarm() {
+                const alarmId = document.getElementById('alarm-id').value;
+                const name = document.getElementById('alarm-name').value;
+                const time = document.getElementById('alarm-time-input').value;
+                const sound = document.getElementById('alarm-sound').value;
+                const vibrate = document.getElementById('alarm-vibrate').checked;
+                
+                // Get selected repeat days
+                const repeatDays = [];
+                document.querySelectorAll('.repeat-day.bg-primary').forEach(btn => {
+                    repeatDays.push(btn.getAttribute('data-day'));
+                });
+                
+                if (alarmId === '') {
+                    // Add new alarm
+                    appData.lastAlarmId++;
+                    const newAlarm = {
+                        id: appData.lastAlarmId,
+                        name,
+                        time,
+                        repeatDays,
+                        sound,
+                        vibrate,
+                        enabled: true
+                    };
+                    
+                    appData.alarms.push(newAlarm);
+                    showNotification('Alarm added successfully');
+                } else {
+                    // Update existing alarm
+                    const alarmIndex = appData.alarms.findIndex(a => a.id === parseInt(alarmId));
+                    if (alarmIndex !== -1) {
+                        const enabled = appData.alarms[alarmIndex].enabled;
+                        
+                        appData.alarms[alarmIndex] = {
+                            id: parseInt(alarmId),
+                            name,
+                            time,
+                            repeatDays,
+                            sound,
+                            vibrate,
+                            enabled
+                        };
+                        
+                        showNotification('Alarm updated successfully');
+                    }
+                }
+                
+                // Close modal, refresh alarms display
+                closeAlarmModal();
+                renderAlarms();
+                
+                // Check alarms in case we just set one for the near future
+                checkAlarms();
+            }
+
+            // Toggle alarm enabled state
+            function toggleAlarm(alarmId, enabled) {
+                const alarmIndex = appData.alarms.findIndex(a => a.id === alarmId);
+                if (alarmIndex !== -1) {
+                    appData.alarms[alarmIndex].enabled = enabled;
+                    showNotification(`Alarm ${enabled ? 'enabled' : 'disabled'}`);
+                }
+            }
+
+            // Edit alarm
+            function editAlarm(alarmId) {
+                openAlarmModal(alarmId);
+            }
+
+            // Delete alarm
+            function deleteAlarm(alarmId) {
+                const alarmIndex = appData.alarms.findIndex(a => a.id === alarmId);
+                if (alarmIndex !== -1) {
+                    appData.alarms.splice(alarmIndex, 1);
+                    renderAlarms();
+                    showNotification('Alarm deleted');
+                }
+            }
+
+            // Update clock display
+            function updateClock() {
+                const now = new Date();
+                
+                // Format time: HH:MM:SS
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+                
+                // Format date: Day, Month DD, YYYY
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                document.getElementById('current-date').textContent = now.toLocaleDateString(undefined, options);
+                
+                // Check alarms
+                checkAlarms();
+            }
+
+            // Check alarms
+            function checkAlarms() {
+                const now = new Date();
+                const currentHours = now.getHours();
+                const currentMinutes = now.getMinutes();
+                const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+                
+                // Map day number to day name
+                const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                const today = dayNames[currentDay];
+                
+                // Check each alarm
+                appData.alarms.forEach(alarm => {
+                    if (alarm.enabled) {
+                        // Check if alarm should ring on this day
+                        const shouldRingToday = alarm.repeatDays.length === 0 || alarm.repeatDays.includes(today);
+                        
+                        if (shouldRingToday) {
+                            // Parse alarm time
+                            const [alarmHours, alarmMinutes] = alarm.time.split(':').map(Number);
+                            
+                            // Check if alarm time matches current time
+                            if (alarmHours === currentHours && alarmMinutes === currentMinutes && now.getSeconds() === 0) {
+                                triggerAlarm(alarm);
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Trigger alarm
+            function triggerAlarm(alarm) {
+                const alarmAlert = document.getElementById('alarm-alert');
+                document.getElementById('alarm-title').textContent = alarm.name || 'Alarm';
+                document.getElementById('alarm-time').textContent = formatTime(alarm.time);
+                
+                // Show alarm
+                alarmAlert.classList.remove('hidden');
+                
+                // Play sound
+                playAlarmSound(alarm.sound || 'default');
+                
+                // Vibrate if supported and enabled
+                if (alarm.vibrate && 'vibrate' in navigator) {
+                    navigator.vibrate([500, 250, 500, 250, 500]);
+                }
+            }
+
+            // Play alarm sound
+            function playAlarmSound(sound) {
+                // Stop any playing sounds first
+                document.querySelectorAll('audio').forEach(audio => audio.pause());
+                
+                // Play the selected sound
+                const audio = document.getElementById(`alarm-sound-${sound}`);
+                if (audio) {
+                    audio.currentTime = 0;
+                    audio.play();
+                    
+                    // Loop the sound
+                    audio.loop = true;
+                }
+            }
+
+            // Check reminders
+            function checkReminders() {
+                const now = new Date();
+                
+                // Check task reminders
+                checkTaskReminders(now);
+                
+                // Check event reminders
+                checkEventReminders(now);
+            }
+
+            // Check task reminders
+            function checkTaskReminders(now) {
+                appData.tasks.forEach(task => {
+                    if (!task.completed && task.reminder) {
+                        const taskDate = new Date(task.date);
+                        const reminderDate = new Date(taskDate);
+                        reminderDate.setMinutes(reminderDate.getMinutes() - task.reminderTime);
+                        
+                        // Check if reminder is due
+                        const timeDiff = Math.abs(now - reminderDate);
+                        if (timeDiff < 60000) { // Within 1 minute
+                            showReminder(`Task Reminder: ${task.name}`, formatDateLong(taskDate));
+                        }
+                    }
+                });
+            }
+
+            // Check event reminders
+            function checkEventReminders(now) {
+                appData.scheduleEvents.forEach(event => {
+                    if (event.reminder) {
+                        const eventDate = new Date(event.date);
+                        const [hours, minutes] = event.startTime.split(':').map(Number);
+                        eventDate.setHours(hours, minutes);
+                        
+                        const reminderDate = new Date(eventDate);
+                        reminderDate.setMinutes(reminderDate.getMinutes() - event.reminderTime);
+                        
+                        // Check if reminder is due
+                        const timeDiff = Math.abs(now - reminderDate);
+                        if (timeDiff < 60000) { // Within 1 minute
+                            showReminder(`Event Reminder: ${event.title}`, `${formatDateShort(eventDate)} at ${formatTime(event.startTime)}`);
+                        }
+                    }
+                });
+            }
+
+            // Show notification
+            function showNotification(message) {
+                const container = document.getElementById('notifications-container');
+                
+                const notification = document.createElement('div');
+                notification.className = 'notification bg-white dark:bg-dark-card shadow-lg rounded-lg p-3 mb-2 max-w-xs w-full';
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-info-circle text-primary mr-2"></i>
+                        <span>${message}</span>
+                    </div>
+                `;
+                
+                container.appendChild(notification);
+                
+                // Remove notification after animation completes (5 seconds)
+                setTimeout(() => {
+                    notification.remove();
+                }, 5000);
+            }
+
+            // Show reminder
+            function showReminder(title, subtitle) {
+                const container = document.getElementById('notifications-container');
+                
+                const notification = document.createElement('div');
+                notification.className = 'notification bg-white dark:bg-dark-card shadow-lg rounded-lg p-3 mb-2 max-w-xs w-full flex flex-col';
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-bell text-primary mr-2"></i>
+                        <span class="font-medium">${title}</span>
+                    </div>
+                    <div class="text-sm text-gray-600 dark:text-gray-300 ml-6">
+                        ${subtitle}
+                    </div>
+                `;
+                
+                container.appendChild(notification);
+                
+                // Play a notification sound
+                const audio = document.getElementById('alarm-sound-gentle');
+                if (audio) {
+                    audio.currentTime = 0;
+                    audio.loop = false;
+                    audio.play();
+                }
+                
+                // Vibrate if supported
+                if ('vibrate' in navigator) {
+                    navigator.vibrate(200);
+                }
+                
+                // Remove notification after animation completes (5 seconds)
+                setTimeout(() => {
+                    notification.remove();
+                }, 5000);
+            }
+
+            // Helper function: Format date as "Mon, Sep 16"
+            function formatDate(date) {
+                const d = new Date(date);
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                const dateOnly = new Date(d);
+                dateOnly.setHours(0, 0, 0, 0);
+                
+                if (dateOnly.getTime() === today.getTime()) {
+                    return 'Today';
+                } else if (dateOnly.getTime() === tomorrow.getTime()) {
+                    return 'Tomorrow';
+                } else {
+                    return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+                }
+            }
+
+            // Helper function: Format date as "Sep 16, 2023"
+            function formatDateShort(date) {
+                const d = new Date(date);
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                
+                return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+            }
+
+            // Helper function: Format date as "Monday, September 16, 2023"
+            function formatDateLong(date) {
+                const d = new Date(date);
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                return d.toLocaleDateString(undefined, options);
+            }
+
+            // Helper function: Format time as "1:30 PM"
+            function formatTime(timeString) {
+                const [hours, minutes] = timeString.split(':').map(Number);
+                const period = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours % 12 || 12;
+                return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+            }
+
+            // Helper function: Format time range as "1:30 PM - 3:00 PM"
+            function formatTimeRange(startTime, endTime) {
+                return `${formatTime(startTime)} - ${formatTime(endTime)}`;
+            }
+
+            // Helper function: Format reminder time
+            function formatReminderTime(minutes) {
+                if (minutes < 60) {
+                    return `${minutes} minutes`;
+                } else if (minutes === 60) {
+                    return '1 hour';
+                } else if (minutes % 60 === 0) {
+                    return `${minutes / 60} hours`;
+                } else {
+                    const hours = Math.floor(minutes / 60);
+                    const mins = minutes % 60;
+                    return `${hours} hour${hours > 1 ? 's' : ''} ${mins} minute${mins > 1 ? 's' : ''}`;
+                }
+            }
+
+            // Initialize the app
+            document.addEventListener('DOMContentLoaded', initializeApp);
+
+            // Make the necessary functions available globally
+            window.toggleTaskCompletion = toggleTaskCompletion;
+            window.editTask = editTask;
+            window.deleteTask = deleteTask;
+            window.editScheduleEvent = editScheduleEvent;
+            window.deleteScheduleEvent = deleteScheduleEvent;
+            window.toggleGoalCompletion = toggleGoalCompletion;
+            window.editGoal = editGoal;
+            window.deleteGoal = deleteGoal;
+            window.toggleAlarm = toggleAlarm;
+            window.editAlarm = editAlarm;
+            window.deleteAlarm = deleteAlarm;
+        </script>
+    </div>
+
+
+</body></html>
