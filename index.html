@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Corrected Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; worker-src blob: https://cdn.jsdelivr.net; connect-src https://cdn.jsdelivr.net; img-src 'self' data:;">
+
+  <title>Upgraded Multi-Tool | Voice & Image to Text</title>
+  
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-gradient-start: #f2f2f7;
+      --bg-gradient-end: #e5e5ea;
+      --text-color: #1c1c1e;
+      --container-bg: rgba(255, 255, 255, 0.7);
+      --textarea-bg: rgba(255, 255, 255, 0.9);
+      --border-color: #d1d1d6;
+      --shadow-color: rgba(0, 0, 0, 0.1);
+      --primary-color: #007aff;
+      --secondary-color: #5856d6;
+      --success-color: #34c759;
+      --error-color: #ff3b30;
+      --warning-color: #ff9500;
+      --hr-color: #e0e0e0;
+      --icon-color: #fff;
+    }
+
+    body.dark-mode {
+      --bg-gradient-start: #1c1c1e;
+      --bg-gradient-end: #2c2c2e;
+      --text-color: #f2f2f7;
+      --container-bg: rgba(44, 44, 46, 0.7);
+      --textarea-bg: #2c2c2e;
+      --border-color: #3a3a3c;
+      --shadow-color: rgba(0, 0, 0, 0.25);
+      --hr-color: #3a3a3c;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      padding: 40px 20px;
+      background-image: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
+      color: var(--text-color);
+      transition: background-image 0.5s ease, color 0.5s ease;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 750px;
+      padding: 30px;
+      text-align: center;
+      background: var(--container-bg);
+      border-radius: 20px;
+      box-shadow: 0 15px 35px var(--shadow-color);
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      animation: fadeIn 0.8s ease-out;
+    }
+    h1 {
+      margin-top: 0;
+      margin-bottom: 25px;
+      font-size: 2rem;
+      font-weight: 600;
+    }
+    h2 {
+        font-size: 1.5rem;
+        color: var(--text-color);
+        margin-top: 40px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid var(--primary-color);
+        padding-bottom: 8px;
+        display: inline-block;
+        font-weight: 400;
+    }
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      height: 220px;
+      padding: 15px;
+      font-size: 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      resize: vertical;
+      background-color: var(--textarea-bg);
+      color: var(--text-color);
+      transition: all 0.3s ease;
+      font-family: 'Poppins', sans-serif;
+    }
+    textarea:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 8px rgba(0, 122, 255, 0.5);
+        outline: none;
+    }
+    .controls, .settings {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+    button, select, label.file-upload {
+      padding: 12px 22px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: var(--icon-color);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 400;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    button:hover:not(:disabled), select:hover, label.file-upload:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    button:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    button i, label.file-upload i {
+        font-size: 1.1em;
+    }
+    select {
+        background-color: var(--warning-color);
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        padding-right: 45px;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 15px center;
+        background-size: 1.2em;
+    }
+    .start-btn { background-color: var(--success-color); }
+    .stop-btn { background-color: var(--error-color); }
+    .copy-btn { background-color: var(--warning-color); }
+    .clear-btn { background-color: var(--primary-color); }
+    .dark-mode-toggle { background-color: #3a3a3c; }
+    .file-upload { background-color: var(--secondary-color); }
+
+    button:disabled {
+        background-color: #9e9e9e;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+    }
+
+    .status {
+        margin-top: 20px;
+        font-size: 1rem;
+        min-height: 24px;
+        color: var(--text-color);
+        transition: color 0.3s ease;
+    }
+    .status.listening {
+        color: var(--success-color);
+        animation: pulse 1.5s infinite;
+    }
+    .label {
+        margin-top: 20px;
+        margin-bottom: 8px;
+        font-weight: 600;
+        text-align: left;
+        font-size: 1.1rem;
+    }
+    hr {
+        border: none;
+        height: 1px;
+        background-color: var(--hr-color);
+        margin: 40px 0;
+    }
+    input[type="file"] { display: none; }
+    
+    #ocr-progress-bar {
+        width: 100%;
+        background-color: var(--border-color);
+        border-radius: 8px;
+        margin-top: 15px;
+        overflow: hidden;
+        display: none;
+    }
+    #ocr-progress {
+        width: 0%;
+        height: 12px;
+        background-color: var(--secondary-color);
+        border-radius: 8px;
+        transition: width 0.3s ease-in-out;
+    }
+  </style>
+</head>
+<body class="dark-mode">
+  <div class="container">
+    <h1><i class="fa-solid fa-wand-magic-sparkles"></i> Multi-Tool Text Converter</h1>
+    
+    <div class="label">Output:</div>
+    <textarea id="output" placeholder="Your transcribed voice or recognized image text will appear here..."></textarea>
+    <div class="controls">
+      <button id="copy-btn" class="copy-btn" onclick="copyText()"><i class="fa-solid fa-copy"></i><span>Copy All</span></button>
+      <button class="clear-btn" onclick="clearText()"><i class="fa-solid fa-eraser"></i> Clear All</button>
+      <button id="dark-mode-toggle" class="dark-mode-toggle" onclick="toggleDarkMode()"><i class="fa-solid fa-sun"></i></button>
+    </div>
+
+    <hr>
+
+    <h2><i class="fa-solid fa-microphone-lines"></i> Voice Tools</h2>
+    <div id="voice-status" class="status">Select your language and start recording.</div>
+    <div class="settings">
+        <select id="language-select">
+            <option value="en-US">English (US)</option><option value="en-GB">English (UK)</option><option value="es-ES">Español (España)</option><option value="es-MX">Español (México)</option><option value="fr-FR">Français</option><option value="de-DE">Deutsch</option><option value="it-IT">Italiano</option><option value="ja-JP">日本語</option><option value="ko-KR">한국어</option><option value="pt-BR">Português (Brasil)</option><option value="ru-RU">Русский</option><option value="zh-CN">中文 (Mandarin)</option>
+        </select>
+        <button id="start-btn" class="start-btn" onclick="startRecognition()"><i class="fa-solid fa-play"></i> Start Recording</button>
+        <button id="stop-btn" class="stop-btn" onclick="stopRecognition()" disabled=""><i class="fa-solid fa-stop"></i> Stop</button>
+    </div>
+
+    <hr>
+
+    <h2><i class="fa-solid fa-image"></i> Image Tools (OCR)</h2>
+    <div id="ocr-status" class="status">Upload an image to extract text.</div>
+    <div class="controls">
+      <label for="image-upload" class="file-upload"><i class="fa-solid fa-upload"></i> Upload Image</label>
+      <input type="file" id="image-upload" accept="image/*" onchange="handleImageUpload(event)">
+    </div>
+    <div id="ocr-progress-bar"><div id="ocr-progress"></div></div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script>
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const output = document.getElementById('output');
+    const voiceStatus = document.getElementById('voice-status');
+    const ocrStatus = document.getElementById('ocr-status');
+    const langSelect = document.getElementById('language-select');
+    const progressBar = document.getElementById('ocr-progress-bar');
+    const progress = document.getElementById('ocr-progress');
+    const copyBtn = document.getElementById('copy-btn');
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+
+    // --- VOICE RECOGNITION ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let isRecognizing = false;
+    let finalTranscript = '';
+
+    if (!SpeechRecognition) {
+        voiceStatus.textContent = "Sorry, your browser does not support Speech Recognition.";
+        startBtn.disabled = true;
+    } else {
+        recognition = new SpeechRecognition();
+    }
+
+    function startRecognition() {
+      if (!recognition || isRecognizing) return;
+
+      finalTranscript = output.value ? output.value + ' ' : ''; 
+      recognition.lang = langSelect.value;
+      recognition.interimResults = true;
+      recognition.continuous = true;
+
+      recognition.onstart = () => {
+        isRecognizing = true;
+        voiceStatus.textContent = "Listening...";
+        voiceStatus.classList.add('listening');
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        langSelect.disabled = true;
+      };
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript.trim() + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        output.value = finalTranscript + interimTranscript;
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === 'not-allowed') {
+            voiceStatus.innerHTML = "<b>Permission Denied.</b><br>Please allow microphone access in your browser settings.";
+        } else {
+            voiceStatus.textContent = "Error: " + event.error;
+        }
+        voiceStatus.classList.remove('listening');
+      };
+
+      recognition.onend = () => {
+        isRecognizing = false;
+        voiceStatus.textContent = "Recording stopped. Click 'Start' to go again.";
+        voiceStatus.classList.remove('listening');
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        langSelect.disabled = false;
+      };
+
+      recognition.start();
+    }
+
+    function stopRecognition() {
+      if (recognition && isRecognizing) {
+        recognition.stop();
+      }
+    }
+
+    // --- IMAGE RECOGNITION (OCR) ---
+    async function handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        ocrStatus.textContent = 'Initializing OCR Engine...';
+        progressBar.style.display = 'block';
+        progress.style.width = '0%';
+
+        try {
+            const worker = await Tesseract.createWorker('eng', 1, {
+                logger: m => {
+                    console.log(m); // Log all messages for debugging
+                    if (m.status === 'recognizing text') {
+                        const progressValue = m.progress * 100;
+                        ocrStatus.textContent = `Recognizing Text... ${Math.round(progressValue)}%`;
+                        progress.style.width = `${progressValue}%`;
+                    } else {
+                        const statusText = m.status.charAt(0).toUpperCase() + m.status.slice(1).replace(/_/g, ' ');
+                        ocrStatus.textContent = `Processing: ${statusText}...`;
+                    }
+                }
+            });
+            
+            const { data: { text } } = await worker.recognize(file);
+            output.value += (output.value ? '\n\n--- OCR Result ---\n' : '') + text;
+            ocrStatus.textContent = 'Image recognition complete! ✨';
+            await worker.terminate();
+
+        } catch (error) {
+            ocrStatus.innerHTML = `<b>OCR Error.</b><br>Could not process image. Please check the console for details.`;
+            console.error("Tesseract.js Error:", error);
+        } finally {
+            event.target.value = ''; // Allow re-uploading the same file
+            setTimeout(() => {
+                progressBar.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    // --- GENERAL CONTROLS ---
+    function clearText() {
+      output.value = '';
+      finalTranscript = '';
+    }
+
+    function copyText() {
+        if (!output.value) return;
+        const copyButtonSpan = copyBtn.querySelector('span');
+        const originalText = copyButtonSpan.textContent;
+
+        output.select();
+        output.setSelectionRange(0, 99999); // For mobile devices
+
+        try {
+            document.execCommand('copy');
+            copyBtn.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+            setTimeout(() => {
+                copyBtn.innerHTML = `<i class="fa-solid fa-copy"></i><span>${originalText}</span>`;
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            copyBtn.innerHTML = `<i class="fa-solid fa-times"></i> Failed`;
+            setTimeout(() => {
+                copyBtn.innerHTML = `<i class="fa-solid fa-copy"></i><span>${originalText}</span>`;
+            }, 2000);
+        }
+        
+        window.getSelection().removeAllRanges(); // Deselect text
+    }
+    
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+      const isDarkMode = document.body.classList.contains('dark-mode');
+      darkModeToggle.innerHTML = isDarkMode ? `<i class="fa-solid fa-sun"></i>` : `<i class="fa-solid fa-moon"></i>`;
+    }
+
+    // Initialize dark mode icon based on default state
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.body.classList.contains('dark-mode')) {
+            darkModeToggle.innerHTML = `<i class="fa-solid fa-sun"></i>`;
+        }
+    });
+
+  </script>
+</body>
+</html>
